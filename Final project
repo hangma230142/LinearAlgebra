@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chill PageRank Animation</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body {
+            font-family: "Arial", sans-serif;
+            background: #f5f7fa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+        }
+        #network {
+            width: 800px;
+            height: 600px;
+            border: 1px solid lightgray;
+            background: white;
+            margin-top: 20px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+<h2>PageRank with Scores Displayed Above Nodes</h2>
+<button onclick="startAnimation()">Start Animation</button>
+<div id="network"></div>
+
+<script>
+    // Original data
+    const allNodes = [
+        {id: 'A', label: 'A\n0.000', pagerank: 0.320},
+        {id: 'B', label: 'B\n0.000', pagerank: 0.310},
+        {id: 'C', label: 'C\n0.000', pagerank: 0.333},
+        {id: 'D', label: 'D\n0.000', pagerank: 0.037},
+    ];
+
+    const allEdges = [
+        {from: 'A', to: 'B'},
+        {from: 'B', to: 'C'},
+        {from: 'C', to: 'A'},
+        {from: 'D', to: 'C'},
+    ];
+
+    // Empty datasets initially
+    const nodes = new vis.DataSet([]);
+    const edges = new vis.DataSet([]);
+
+    const container = document.getElementById('network');
+    const data = { nodes: nodes, edges: edges };
+
+    const options = {
+        nodes: {
+            shape: 'circle',
+            size: 30,
+            color: {
+                background: 'skyblue',
+                border: 'black'
+            },
+            font: {
+                size: 16,
+                color: 'black'
+            }
+        },
+        edges: {
+            arrows: 'to',
+            color: {color: 'black'}
+        },
+        physics: {
+            stabilization: false
+        }
+    };
+
+    const network = new vis.Network(container, data, options);
+
+    function startAnimation() {
+        nodes.clear();
+        edges.clear();
+        let step = 0;
+        const delayPerNode = 800; // ms
+        const animationDuration = 3000; // ms to animate the pagerank scores
+
+        function addNext() {
+            if (step < allNodes.length) {
+                const node = allNodes[step];
+                nodes.add(node);
+
+                // Add edges connected to this node
+                allEdges.forEach(edge => {
+                    if (edge.from === node.id) {
+                        edges.add(edge);
+                    }
+                });
+
+                animateScore(node.id, node.pagerank, animationDuration);
+
+                step++;
+                setTimeout(addNext, delayPerNode);
+            }
+        }
+
+        addNext();
+    }
+
+    function animateScore(nodeId, targetScore, duration) {
+        const start = performance.now();
+
+        function update(timestamp) {
+            const elapsed = timestamp - start;
+            const progress = Math.min(elapsed / duration, 1);
+            const currentScore = (targetScore * progress).toFixed(3);
+            const node = nodes.get(nodeId);
+            nodes.update({id: nodeId, label: `${nodeId}\n${currentScore}`});
+
+            if (progress < 1) {
+                requestAnimationFrame(update);
+            }
+        }
+
+        requestAnimationFrame(update);
+    }
+</script>
+
+</body>
+</html>
