@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Chill PageRank Animation</title>
+    <title>PageRank with Scores Displayed Above Nodes</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         body {
             font-family: "Arial", sans-serif;
-            background: #f5f7fa;
+            background: #f0f2f5;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding-top: 20px;
         }
         #network {
-            width: 800px;
-            height: 600px;
+            width: 900px;
+            height: 700px;
             border: 1px solid lightgray;
             background: white;
             margin-top: 20px;
@@ -42,12 +42,12 @@
 <div id="network"></div>
 
 <script>
-    // Original data
+    // Dữ liệu
     const allNodes = [
-        {id: 'A', label: 'A\n0.000', pagerank: 0.320},
-        {id: 'B', label: 'B\n0.000', pagerank: 0.310},
-        {id: 'C', label: 'C\n0.000', pagerank: 0.333},
-        {id: 'D', label: 'D\n0.000', pagerank: 0.037},
+        {id: 'A', label: 'A\n0.000', pagerank: 0.320, x: -200, y: 200},
+        {id: 'B', label: 'B\n0.000', pagerank: 0.310, x: 0, y: 0},
+        {id: 'C', label: 'C\n0.000', pagerank: 0.333, x: 200, y: 200},
+        {id: 'D', label: 'D\n0.000', pagerank: 0.037, x: 0, y: -200},
     ];
 
     const allEdges = [
@@ -57,7 +57,6 @@
         {from: 'D', to: 'C'},
     ];
 
-    // Empty datasets initially
     const nodes = new vis.DataSet([]);
     const edges = new vis.DataSet([]);
 
@@ -73,17 +72,22 @@
                 border: 'black'
             },
             font: {
-                size: 16,
-                color: 'black'
-            }
+                size: 18,
+                color: 'black',
+                multi: 'html'
+            },
+            physics: false, // tắt luôn physics để node đúng vị trí
+            fixed: true
         },
         edges: {
             arrows: 'to',
-            color: {color: 'black'}
+            color: {color: 'black'},
+            smooth: {
+                type: "continuous",
+                forceDirection: "horizontal",
+                roundness: 0
+            }
         },
-        physics: {
-            stabilization: false
-        }
     };
 
     const network = new vis.Network(container, data, options);
@@ -91,41 +95,45 @@
     function startAnimation() {
         nodes.clear();
         edges.clear();
-        let step = 0;
-        const delayPerNode = 800; // ms
-        const animationDuration = 3000; // ms to animate the pagerank scores
 
-        function addNext() {
-            if (step < allNodes.length) {
-                const node = allNodes[step];
-                nodes.add(node);
+        allNodes.forEach(node => {
+            nodes.add({
+                id: node.id,
+                label: node.label,
+                x: node.x,
+                y: node.y,
+                fixed: {x: true, y: true} // giữ cứng vị trí
+            });
+        });
 
-                // Add edges connected to this node
-                allEdges.forEach(edge => {
-                    if (edge.from === node.id) {
-                        edges.add(edge);
-                    }
-                });
+        let edgeStep = 0;
+        const delayPerEdge = 800;
+        const animationDuration = 3000;
 
-                animateScore(node.id, node.pagerank, animationDuration);
-
-                step++;
-                setTimeout(addNext, delayPerNode);
+        function addNextEdge() {
+            if (edgeStep < allEdges.length) {
+                edges.add(allEdges[edgeStep]);
+                edgeStep++;
+                setTimeout(addNextEdge, delayPerEdge);
+            } else {
+                animateAllScores(animationDuration);
             }
         }
 
-        addNext();
+        setTimeout(addNextEdge, 1000);
     }
 
-    function animateScore(nodeId, targetScore, duration) {
+    function animateAllScores(duration) {
         const start = performance.now();
 
         function update(timestamp) {
             const elapsed = timestamp - start;
             const progress = Math.min(elapsed / duration, 1);
-            const currentScore = (targetScore * progress).toFixed(3);
-            const node = nodes.get(nodeId);
-            nodes.update({id: nodeId, label: `${nodeId}\n${currentScore}`});
+
+            allNodes.forEach(node => {
+                const currentScore = (node.pagerank * progress).toFixed(3);
+                nodes.update({id: node.id, label: `${node.id}\n${currentScore}`});
+            });
 
             if (progress < 1) {
                 requestAnimationFrame(update);
@@ -137,4 +145,5 @@
 </script>
 
 </body>
+</html>ody>
 </html>
