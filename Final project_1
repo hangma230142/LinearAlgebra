@@ -1,129 +1,106 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>PageRank with Scores Displayed Above Nodes</title>
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <title>PageRank Visualization</title>
+    <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+    <link href="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.css" rel="stylesheet">
     <style>
         body {
-            font-family: "Arial", sans-serif;
-            background: #f0f2f5;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            padding-top: 20px;
+            margin-top: 20px;
+        }
+        .controls {
+            margin-left: 20px;
         }
         #network {
-            width: 900px;
-            height: 700px;
+            width: 1240px;
+            height: 840px;
             border: 1px solid lightgray;
-            background: white;
-            margin-top: 20px;
         }
-        button {
-            margin-top: 20px;
-            padding: 10px 20px;
+        input, button {
             font-size: 16px;
-            border-radius: 8px;
-            border: none;
-            background-color: #4CAF50;
-            color: white;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
+            margin: 5px;
         }
     </style>
 </head>
 <body>
 
-<h2>PageRank with Scores Displayed Above Nodes</h2>
-<button onclick="startAnimation()">Start Animation</button>
-<div id="network"></div>
+<h2 style="text-align:center">PageRank Visualization Tool</h2>
 
+<div class="container">
+    <div id="network"></div>
+    <div class="controls">
+        <label>Enter edges (e.g., A B B C C A D C):</label><br>
+        <input type="text" id="edgeInput" value="A B B C C A D C" size="30"><br>
+        <button onclick="runCustom()">Run</button>
+        <button onclick="runExample()">Use Example Graph</button>
+        <pre id="output"></pre>
+    </div>
+</div>
+
+<!-- (Giữ nguyên phần đầu HTML đến <script>) -->
 <script>
-    // Dữ liệu
-    const allNodes = [
-        {id: 'A', label: 'A\n0.000', pagerank: 0.320, x: -200, y: 200},
-        {id: 'B', label: 'B\n0.000', pagerank: 0.310, x: 0, y: 0},
-        {id: 'C', label: 'C\n0.000', pagerank: 0.333, x: 200, y: 200},
-        {id: 'D', label: 'D\n0.000', pagerank: 0.037, x: 0, y: -200},
-    ];
+    function pagerank(nodes, edges, alpha = 0.85, epsilon = 1e-6) {
+        let n = nodes.length;
+        let nodeIndex = {};
+        nodes.forEach((node, i) => nodeIndex[node] = i);
 
-    const allEdges = [
-        {from: 'A', to: 'B'},
-        {from: 'B', to: 'C'},
-        {from: 'C', to: 'A'},
-        {from: 'D', to: 'C'},
-    ];
-
-    const nodes = new vis.DataSet([]);
-    const edges = new vis.DataSet([]);
-
-    const container = document.getElementById('network');
-    const data = { nodes: nodes, edges: edges };
-
-    const options = {
-        nodes: {
-            shape: 'circle',
-            size: 30,
-            color: {
-                background: 'skyblue',
-                border: 'black'
-            },
-            font: {
-                size: 18,
-                color: 'black',
-                multi: 'html'
-            },
-            physics: false, // tắt luôn physics để node đúng vị trí
-            fixed: true
-        },
-        edges: {
-            arrows: 'to',
-            color: {color: 'black'},
-            smooth: {
-                type: "continuous",
-                forceDirection: "horizontal",
-                roundness: 0
-            }
-        },
-    };
-
-    const network = new vis.Network(container, data, options);
-
-    function startAnimation() {
-        nodes.clear();
-        edges.clear();
-
-        allNodes.forEach(node => {
-            nodes.add({
-                id: node.id,
-                label: node.label,
-                x: node.x,
-                y: node.y,
-                fixed: {x: true, y: true} // giữ cứng vị trí
-            });
+        let adj = Array.from({length: n}, () => Array(n).fill(0));
+        edges.forEach(([src, dst]) => {
+            let i = nodeIndex[dst];
+            let j = nodeIndex[src];
+            adj[i][j] = 1;
         });
 
-        let edgeStep = 0;
-        const delayPerEdge = 800;
-        const animationDuration = 3000;
-
-        function addNextEdge() {
-            if (edgeStep < allEdges.length) {
-                edges.add(allEdges[edgeStep]);
-                edgeStep++;
-                setTimeout(addNextEdge, delayPerEdge);
+        let stochastic = Array.from({length: n}, () => Array(n).fill(0));
+        for (let j = 0; j < n; j++) {
+            let colSum = adj.reduce((sum, row) => sum + row[j], 0);
+            if (colSum !== 0) {
+                for (let i = 0; i < n; i++) {
+                    stochastic[i][j] = adj[i][j] / colSum;
+                }
             } else {
-                animateAllScores(animationDuration);
+                for (let i = 0; i < n; i++) {
+                    stochastic[i][j] = 1 / n;
+                }
             }
         }
 
-        setTimeout(addNextEdge, 1000);
+        let G = Array.from({length: n}, (_, i) =>
+            Array.from({length: n}, (_, j) =>
+                alpha * stochastic[i][j] + (1 - alpha) / n
+            )
+        );
+
+        let v = Array(n).fill(1 / n);
+        let delta = 1, iteration = 0;
+        while (delta > epsilon) {
+            let v_new = Array(n).fill(0);
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    v_new[i] += G[i][j] * v[j];
+                }
+            }
+            delta = v_new.reduce((acc, val, i) => acc + Math.abs(val - v[i]), 0);
+            v = v_new;
+            iteration += 1;
+        }
+
+        let result = {};
+        nodes.forEach((node, i) => result[node] = v[i]);
+        return { result, iteration };
     }
 
-    function animateAllScores(duration) {
+    let network = null;
+
+    function animateAllScores(nodesDataset, allNodes, duration) {
         const start = performance.now();
 
         function update(timestamp) {
@@ -132,7 +109,7 @@
 
             allNodes.forEach(node => {
                 const currentScore = (node.pagerank * progress).toFixed(3);
-                nodes.update({id: node.id, label: `${node.id}\n${currentScore}`});
+                nodesDataset.update({ id: node.id, label: `${node.id}\n${currentScore}` });
             });
 
             if (progress < 1) {
@@ -142,8 +119,92 @@
 
         requestAnimationFrame(update);
     }
-</script>
 
+    function drawGraph(nodes, edges, pagerankScores) {
+        let nodesData = nodes.map(node => ({
+            id: node,
+            label: `${node}\n0.000`,
+            color: 'skyblue',
+            font: { size: 30, color: 'darkgreen', bold: true, multi: 'html' },
+            shape: 'ellipse',
+            scaling: { min: 50, max: 50 }
+        }));
+
+        let container = document.getElementById('network');
+        let data = { nodes: new vis.DataSet(nodesData), edges: new vis.DataSet([]) };
+
+        let options = {
+            layout: { improvedLayout: true },
+            physics: {
+                stabilization: true,
+                barnesHut: {
+                    springLength: 300,
+                    avoidOverlap: 0.5
+                }
+            },
+            edges: { arrows: 'to', color: { color: 'black' }, width: 3 },
+            nodes: { borderWidth: 2 }
+        };
+
+        network = new vis.Network(container, data, options);
+
+        // Step 1: show nodes
+        setTimeout(() => {
+            // Step 2: add edges
+            let edgesData = edges.map(([src, dst]) => ({ from: src, to: dst, arrows: 'to' }));
+            data.edges = new vis.DataSet(edgesData);
+            network.setData(data);
+
+            // Step 3: animate PageRank scores
+            let allNodes = nodes.map(node => ({
+                id: node,
+                pagerank: pagerankScores[node]
+            }));
+            setTimeout(() => animateAllScores(data.nodes, allNodes, 1500), 500);
+
+        }, 500);
+    }
+
+    function runExample() {
+        let edges = [['A', 'B'], ['B', 'C'], ['C', 'A'], ['D', 'C']];
+        let nodes = [...new Set(edges.flat())];
+        let { result, iteration } = pagerank(nodes, edges);
+
+        let leaderboard = Object.entries(result).sort((a, b) => b[1] - a[1]);
+        let output = `PageRank Scores (after ${iteration} iterations):\n`;
+        leaderboard.forEach(([node, score], i) => {
+            output += `${i + 1}. ${node}: ${score.toFixed(4)}\n`;
+        });
+        document.getElementById('output').textContent = output;
+
+        drawGraph(nodes, edges, result);
+    }
+
+    function runCustom() {
+        let userInput = document.getElementById('edgeInput').value;
+        let edgeList = userInput.trim().split(/\s+/);
+        if (edgeList.length % 2 !== 0) {
+            alert("Invalid input: please enter pairs of nodes.");
+            return;
+        }
+        let edges = [];
+        for (let i = 0; i < edgeList.length; i += 2) {
+            edges.push([edgeList[i], edgeList[i+1]]);
+        }
+        let nodes = [...new Set(edges.flat())];
+        let { result, iteration } = pagerank(nodes, edges);
+
+        let leaderboard = Object.entries(result).sort((a, b) => b[1] - a[1]);
+        let output = `PageRank Scores (after ${iteration} iterations):\n`;
+        leaderboard.forEach(([node, score], i) => {
+            output += `${i + 1}. ${node}: ${score.toFixed(4)}\n`;
+        });
+        document.getElementById('output').textContent = output;
+
+        drawGraph(nodes, edges, result);
+    }
+
+    runExample();
+</script>
 </body>
-</html>ody>
 </html>
