@@ -45,7 +45,6 @@
     </div>
 </div>
 
-<!-- (Giữ nguyên phần đầu HTML đến <script>) -->
 <script>
     function pagerank(nodes, edges, alpha = 0.85, epsilon = 1e-6) {
         let n = nodes.length;
@@ -121,17 +120,10 @@
     }
 
     function drawGraph(nodes, edges, pagerankScores) {
-        let nodesData = nodes.map(node => ({
-            id: node,
-            label: `${node}\n0.000`,
-            color: 'skyblue',
-            font: { size: 30, color: 'darkgreen', bold: true, multi: 'html' },
-            shape: 'ellipse',
-            scaling: { min: 50, max: 50 }
-        }));
-
         let container = document.getElementById('network');
-        let data = { nodes: new vis.DataSet(nodesData), edges: new vis.DataSet([]) };
+        let nodesData = new vis.DataSet([]);
+        let edgesData = new vis.DataSet([]);
+        let data = { nodes: nodesData, edges: edgesData };
 
         let options = {
             layout: { improvedLayout: true },
@@ -148,21 +140,48 @@
 
         network = new vis.Network(container, data, options);
 
-        // Step 1: show nodes
-        setTimeout(() => {
-            // Step 2: add edges
-            let edgesData = edges.map(([src, dst]) => ({ from: src, to: dst, arrows: 'to' }));
-            data.edges = new vis.DataSet(edgesData);
-            network.setData(data);
+        let nodeIndex = {};
+        nodes.forEach((node, i) => nodeIndex[node] = i);
 
-            // Step 3: animate PageRank scores
-            let allNodes = nodes.map(node => ({
+        let i = 0;
+        function addNextNode() {
+            if (i >= nodes.length) {
+                setTimeout(() => {
+                    let j = 0;
+                    function addNextEdge() {
+                        if (j >= edges.length) {
+                            // Animate scores
+                            let allNodes = nodes.map(node => ({
+                                id: node,
+                                pagerank: pagerankScores[node]
+                            }));
+                            setTimeout(() => animateAllScores(nodesData, allNodes, 1000), 500);
+                            return;
+                        }
+                        let edge = edges[j];
+                        edgesData.add({ from: edge[0], to: edge[1], arrows: 'to' });
+                        j++;
+                        setTimeout(addNextEdge, 400);
+                    }
+                    addNextEdge();
+                }, 500);
+                return;
+            }
+
+            let node = nodes[i];
+            nodesData.add({
                 id: node,
-                pagerank: pagerankScores[node]
-            }));
-            setTimeout(() => animateAllScores(data.nodes, allNodes, 1500), 500);
+                label: node,
+                color: 'skyblue',
+                font: { size: 30, color: 'darkgreen', bold: true },
+                shape: 'ellipse',
+                scaling: { min: 50, max: 50 }
+            });
+            i++;
+            setTimeout(addNextNode, 400);
+        }
 
-        }, 500);
+        addNextNode();
     }
 
     function runExample() {
@@ -204,7 +223,11 @@
         drawGraph(nodes, edges, result);
     }
 
+    // Auto run
     runExample();
 </script>
+
+</body>
+</html>
 </body>
 </html>
