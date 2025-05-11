@@ -46,188 +46,187 @@
 </div>
 
 <script>
-    function pagerank(nodes, edges, alpha = 0.85, epsilon = 1e-6) {
-        let n = nodes.length;
-        let nodeIndex = {};
-        nodes.forEach((node, i) => nodeIndex[node] = i);
+function pagerank(nodes, edges, alpha = 0.85, epsilon = 1e-6) {
+    let n = nodes.length;
+    let nodeIndex = {};
+    nodes.forEach((node, i) => nodeIndex[node] = i);
 
-        let adj = Array.from({length: n}, () => Array(n).fill(0));
-        edges.forEach(([src, dst]) => {
-            let i = nodeIndex[dst];
-            let j = nodeIndex[src];
-            adj[i][j] = 1;
-        });
+    let adj = Array.from({length: n}, () => Array(n).fill(0));
+    edges.forEach(([src, dst]) => {
+        let i = nodeIndex[dst];
+        let j = nodeIndex[src];
+        adj[i][j] = 1;
+    });
 
-        let stochastic = Array.from({length: n}, () => Array(n).fill(0));
-        for (let j = 0; j < n; j++) {
-            let colSum = adj.reduce((sum, row) => sum + row[j], 0);
-            if (colSum !== 0) {
-                for (let i = 0; i < n; i++) {
-                    stochastic[i][j] = adj[i][j] / colSum;
-                }
-            } else {
-                for (let i = 0; i < n; i++) {
-                    stochastic[i][j] = 1 / n;
-                }
-            }
-        }
-
-        let G = Array.from({length: n}, (_, i) =>
-            Array.from({length: n}, (_, j) =>
-                alpha * stochastic[i][j] + (1 - alpha) / n
-            )
-        );
-
-        let v = Array(n).fill(1 / n);
-        let delta = 1, iteration = 0;
-        while (delta > epsilon) {
-            let v_new = Array(n).fill(0);
+    let stochastic = Array.from({length: n}, () => Array(n).fill(0));
+    for (let j = 0; j < n; j++) {
+        let colSum = adj.reduce((sum, row) => sum + row[j], 0);
+        if (colSum !== 0) {
             for (let i = 0; i < n; i++) {
-                for (let j = 0; j < n; j++) {
-                    v_new[i] += G[i][j] * v[j];
-                }
+                stochastic[i][j] = adj[i][j] / colSum;
             }
-            delta = v_new.reduce((acc, val, i) => acc + Math.abs(val - v[i]), 0);
-            v = v_new;
-            iteration += 1;
-        }
-
-        let result = {};
-        nodes.forEach((node, i) => result[node] = v[i]);
-        return { result, iteration };
-    }
-
-    let network = null;
-
-    function animateAllScores(nodesDataset, allNodes, duration) {
-        const start = performance.now();
-
-        function update(timestamp) {
-            const elapsed = timestamp - start;
-            const progress = Math.min(elapsed / duration, 1);
-
-            allNodes.forEach(node => {
-                const currentScore = (node.pagerank * progress).toFixed(3);
-                nodesDataset.update({ id: node.id, label: `${node.id}\n${currentScore}` });
-            });
-
-            if (progress < 1) {
-                requestAnimationFrame(update);
+        } else {
+            for (let i = 0; i < n; i++) {
+                stochastic[i][j] = 1 / n;
             }
         }
-
-        requestAnimationFrame(update);
     }
 
-    function drawGraph(nodes, edges, pagerankScores) {
-        let container = document.getElementById('network');
-        let nodesData = new vis.DataSet([]);
-        let edgesData = new vis.DataSet([]);
-        let data = { nodes: nodesData, edges: edgesData };
+    let G = Array.from({length: n}, (_, i) =>
+        Array.from({length: n}, (_, j) =>
+            alpha * stochastic[i][j] + (1 - alpha) / n
+        )
+    );
 
-        let options = {
-            layout: { improvedLayout: true },
-            physics: {
-                stabilization: true,
-                barnesHut: {
-                    springLength: 300,
-                    avoidOverlap: 0.5
-                }
-            },
-            edges: { arrows: 'to', color: { color: 'black' }, width: 3 },
-            nodes: { borderWidth: 2 }
-        };
-
-        network = new vis.Network(container, data, options);
-
-        let nodeIndex = {};
-        nodes.forEach((node, i) => nodeIndex[node] = i);
-
-        let i = 0;
-        function addNextNode() {
-            if (i >= nodes.length) {
-                setTimeout(() => {
-                    let j = 0;
-                    function addNextEdge() {
-                        if (j >= edges.length) {
-                            // Animate scores
-                            let allNodes = nodes.map(node => ({
-                                id: node,
-                                pagerank: pagerankScores[node]
-                            }));
-                            setTimeout(() => animateAllScores(nodesData, allNodes, 1000), 500);
-                            return;
-                        }
-                        let edge = edges[j];
-                        edgesData.add({ from: edge[0], to: edge[1], arrows: 'to' });
-                        j++;
-                        setTimeout(addNextEdge, 400);
-                    }
-                    addNextEdge();
-                }, 500);
-                return;
+    let v = Array(n).fill(1 / n);
+    let delta = 1, iteration = 0;
+    while (delta > epsilon) {
+        let v_new = Array(n).fill(0);
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                v_new[i] += G[i][j] * v[j];
             }
-
-            let node = nodes[i];
-            nodesData.add({
-                id: node,
-                label: node,
-                color: 'skyblue',
-                font: { size: 30, color: 'darkgreen', bold: true },
-                shape: 'ellipse',
-                scaling: { min: 50, max: 50 }
-            });
-            i++;
-            setTimeout(addNextNode, 400);
         }
-
-        addNextNode();
+        delta = v_new.reduce((acc, val, i) => acc + Math.abs(val - v[i]), 0);
+        v = v_new;
+        iteration += 1;
     }
 
-    function runExample() {
-        let edges = [['A', 'B'], ['B', 'C'], ['C', 'A'], ['D', 'C']];
-        let nodes = [...new Set(edges.flat())];
-        let { result, iteration } = pagerank(nodes, edges);
+    let result = {};
+    nodes.forEach((node, i) => result[node] = v[i]);
+    return { result, iteration };
+}
 
-        let leaderboard = Object.entries(result).sort((a, b) => b[1] - a[1]);
-        let output = `PageRank Scores (after ${iteration} iterations):\n`;
-        leaderboard.forEach(([node, score], i) => {
-            output += `${i + 1}. ${node}: ${score.toFixed(4)}\n`;
+let network = null;
+
+function animateAllScores(nodesDataset, allNodes, duration) {
+    const start = performance.now();
+
+    function update(timestamp) {
+        const elapsed = timestamp - start;
+        const progress = Math.min(elapsed / duration, 1);
+
+        allNodes.forEach(node => {
+            const currentScore = (node.pagerank * progress).toFixed(3);
+            nodesDataset.update({ id: node.id, label: `${node.id}\n${currentScore}` });
         });
-        document.getElementById('output').textContent = output;
 
-        drawGraph(nodes, edges, result);
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
     }
 
-    function runCustom() {
-        let userInput = document.getElementById('edgeInput').value;
-        let edgeList = userInput.trim().split(/\s+/);
-        if (edgeList.length % 2 !== 0) {
-            alert("Invalid input: please enter pairs of nodes.");
+    requestAnimationFrame(update);
+}
+
+function drawGraph(nodes, edges, pagerankScores) {
+    let container = document.getElementById('network');
+    let nodesData = new vis.DataSet([]);
+    let edgesData = new vis.DataSet([]);
+    let data = { nodes: nodesData, edges: edgesData };
+
+    let options = {
+        layout: { improvedLayout: true },
+        physics: {
+            stabilization: true,
+            barnesHut: {
+                springLength: 300,
+                avoidOverlap: 0.5
+            }
+        },
+        edges: { arrows: 'to', color: { color: 'black' }, width: 3 },
+        nodes: { borderWidth: 2 }
+    };
+
+    network = new vis.Network(container, data, options);
+
+    let nodeIndex = {};
+    nodes.forEach((node, i) => nodeIndex[node] = i);
+
+    let i = 0;
+    function addNextNode() {
+        if (i >= nodes.length) {
+            setTimeout(() => {
+                let j = 0;
+                function addNextEdge() {
+                    if (j >= edges.length) {
+                        // Animate scores
+                        let allNodes = nodes.map(node => ({
+                            id: node,
+                            pagerank: pagerankScores[node]
+                        }));
+                        setTimeout(() => animateAllScores(nodesData, allNodes, 1000), 500);
+                        return;
+                    }
+                    let edge = edges[j];
+                    edgesData.add({ from: edge[0], to: edge[1], arrows: 'to' });
+                    j++;
+                    setTimeout(addNextEdge, 400);
+                }
+                addNextEdge();
+            }, 500);
             return;
         }
-        let edges = [];
-        for (let i = 0; i < edgeList.length; i += 2) {
-            edges.push([edgeList[i], edgeList[i+1]]);
-        }
-        let nodes = [...new Set(edges.flat())];
-        let { result, iteration } = pagerank(nodes, edges);
 
-        let leaderboard = Object.entries(result).sort((a, b) => b[1] - a[1]);
-        let output = `PageRank Scores (after ${iteration} iterations):\n`;
-        leaderboard.forEach(([node, score], i) => {
-            output += `${i + 1}. ${node}: ${score.toFixed(4)}\n`;
+        let node = nodes[i];
+        nodesData.add({
+            id: node,
+            label: node,
+            color: 'skyblue',
+            font: { size: 30, color: 'darkgreen', bold: true },
+            shape: 'ellipse',
+            scaling: { min: 50, max: 50 }
         });
-        document.getElementById('output').textContent = output;
-
-        drawGraph(nodes, edges, result);
+        i++;
+        setTimeout(addNextNode, 400);
     }
 
-    // Auto run
-    runExample();
+    addNextNode();
+}
+
+function runExample() {
+    let edges = [['A', 'B'], ['B', 'C'], ['C', 'A'], ['D', 'C']];
+    let nodes = [...new Set(edges.flat())];
+    let { result, iteration } = pagerank(nodes, edges);
+
+    let leaderboard = Object.entries(result).sort((a, b) => b[1] - a[1]);
+    let output = `PageRank Scores (after ${iteration} iterations):\n`;
+    leaderboard.forEach(([node, score], i) => {
+        output += `${i + 1}. ${node}: ${score.toFixed(4)}\n`;
+    });
+    document.getElementById('output').textContent = output;
+
+    drawGraph(nodes, edges, result);
+}
+
+function runCustom() {
+    let userInput = document.getElementById('edgeInput').value;
+    let edgeList = userInput.trim().split(/\s+/);
+    if (edgeList.length % 2 !== 0) {
+        alert("Invalid input: please enter pairs of nodes.");
+        return;
+    }
+    let edges = [];
+    for (let i = 0; i < edgeList.length; i += 2) {
+        edges.push([edgeList[i], edgeList[i+1]]);
+    }
+    let nodes = [...new Set(edges.flat())];
+    let { result, iteration } = pagerank(nodes, edges);
+
+    let leaderboard = Object.entries(result).sort((a, b) => b[1] - a[1]);
+    let output = `PageRank Scores (after ${iteration} iterations):\n`;
+    leaderboard.forEach(([node, score], i) => {
+        output += `${i + 1}. ${node}: ${score.toFixed(4)}\n`;
+    });
+    document.getElementById('output').textContent = output;
+
+    drawGraph(nodes, edges, result);
+}
+
+// Auto run
+runExample();
 </script>
 
 </body>
 </html>
-</body>
-</html>
+
